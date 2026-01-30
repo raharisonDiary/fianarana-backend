@@ -8,11 +8,13 @@ app.use(cors());
 app.use(express.json());
 
 const MONGO_URI = "mongodb+srv://diary:diary1234@cluster0.q60ysss.mongodb.net/fianarana?retryWrites=true&w=majority";
+
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Mifandray amin'ny MongoDB Atlas"))
   .catch(err => console.log("❌ Erreur MongoDB:", err));
 
 // --- MODELS ---
+
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -33,7 +35,7 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
 
-// --- ROUTES ---
+// --- ROUTES AUTH ---
 
 app.post('/api/auth/register', async (req, res) => {
     try {
@@ -54,6 +56,8 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+// --- ROUTES COURSES ---
+
 app.post('/api/courses/add', async (req, res) => {
     try {
         const { title, price, image, desc, category } = req.body;
@@ -73,6 +77,8 @@ app.get('/api/courses/all', async (req, res) => {
         res.json(courses);
     } catch (err) { res.status(500).send("Erreur server"); }
 });
+
+// --- ROUTES FAVORITES ---
 
 app.post('/api/favorites/toggle', async (req, res) => {
     try {
@@ -101,7 +107,7 @@ app.get('/api/favorites/all', async (req, res) => {
 
 // --- LOJIKA VALIDATION (ENROLLMENT) ---
 
-// 1. Mpianatra mividy cours (Tsy mbola activated)
+// 1. Mpianatra mividy cours
 app.post('/api/enroll', async (req, res) => {
     try {
         const { userEmail, courseId, transactionRef, method } = req.body;
@@ -117,16 +123,16 @@ app.post('/api/enroll', async (req, res) => {
             courseId,
             transactionRef,
             method,
-            isActivated: false  // TSY MAINTSY FALSE ETO
+            isActivated: false // Miandry ny Admin foana eto
         });
         await newEnroll.save();
         res.status(201).json({ success: true, message: "Demande envoyée!" });
     } catch (err) {
-        res.status(500).json({ message: "Erreur" });
+        res.status(500).json({ message: "Erreur tamin'ny fandefasana fangatahana" });
     }
 });
 
-// 2. My Learning (Ireo cours efa isActivated: true IHANY no mivoaka eto)
+// 2. My Learning (Mpianatra - Ireo cours efa 'true' ihany)
 app.get('/api/my-learning/:email', async (req, res) => {
     try {
         const email = req.params.email.toLowerCase().trim();
@@ -138,7 +144,7 @@ app.get('/api/my-learning/:email', async (req, res) => {
     }
 });
 
-// 3. Admin: Mijery ny paiement mbola miandry validation (isActivated: false)
+// 3. Admin: Lisitry ny paiement miandry (isActivated: false)
 app.get('/api/admin/pending-payments', async (req, res) => {
     try {
         const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
@@ -155,19 +161,19 @@ app.get('/api/admin/pending-payments', async (req, res) => {
     }
 });
 
-// 4. Admin: Manindry ny bokotra MAINTSO hanovana azy ho "true"
+// 4. Admin: Validation (Ovaina ho 'true')
 app.post('/api/admin/approve-payment', async (req, res) => {
     try {
         const { enrollId } = req.body;
         const updated = await Enrollment.findByIdAndUpdate(
             enrollId, 
-            { isActivated: true }, // Ovaina ho true amin'izay eto
+            { isActivated: true }, 
             { new: true }
         );
         if (updated) {
             res.json({ success: true, message: "Validé!" });
         } else {
-            res.status(404).json({ success: false, message: "Non trouvé" });
+            res.status(404).json({ success: false, message: "Fangatahana tsy hita" });
         }
     } catch (err) {
         res.status(500).json({ success: false });
@@ -175,4 +181,4 @@ app.post('/api/admin/approve-payment', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server mandeha amin'ny port ${PORT}`));
