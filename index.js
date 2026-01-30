@@ -12,6 +12,7 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Mifandray amin'ny MongoDB Atlas"))
   .catch(err => console.log("❌ Erreur MongoDB:", err));
 
+// --- MODELS ---
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -31,6 +32,8 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     email: { type: String, required: true },
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
+
+// --- ROUTES ---
 
 app.post('/api/auth/register', async (req, res) => {
     try {
@@ -96,6 +99,9 @@ app.get('/api/favorites/all', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
+// --- LOJIKA VALIDATION (ENROLLMENT) ---
+
+// 1. Mpianatra mividy cours (Tsy mbola activated)
 app.post('/api/enroll', async (req, res) => {
     try {
         const { userEmail, courseId, transactionRef, method } = req.body;
@@ -111,7 +117,7 @@ app.post('/api/enroll', async (req, res) => {
             courseId,
             transactionRef,
             method,
-            isActivated: false 
+            isActivated: false  // TSY MAINTSY FALSE ETO
         });
         await newEnroll.save();
         res.status(201).json({ success: true, message: "Demande envoyée!" });
@@ -120,6 +126,7 @@ app.post('/api/enroll', async (req, res) => {
     }
 });
 
+// 2. My Learning (Ireo cours efa isActivated: true IHANY no mivoaka eto)
 app.get('/api/my-learning/:email', async (req, res) => {
     try {
         const email = req.params.email.toLowerCase().trim();
@@ -131,6 +138,7 @@ app.get('/api/my-learning/:email', async (req, res) => {
     }
 });
 
+// 3. Admin: Mijery ny paiement mbola miandry validation (isActivated: false)
 app.get('/api/admin/pending-payments', async (req, res) => {
     try {
         const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
@@ -147,10 +155,15 @@ app.get('/api/admin/pending-payments', async (req, res) => {
     }
 });
 
+// 4. Admin: Manindry ny bokotra MAINTSO hanovana azy ho "true"
 app.post('/api/admin/approve-payment', async (req, res) => {
     try {
         const { enrollId } = req.body;
-        const updated = await Enrollment.findByIdAndUpdate(enrollId, { isActivated: true }, { new: true });
+        const updated = await Enrollment.findByIdAndUpdate(
+            enrollId, 
+            { isActivated: true }, // Ovaina ho true amin'izay eto
+            { new: true }
+        );
         if (updated) {
             res.json({ success: true, message: "Validé!" });
         } else {
