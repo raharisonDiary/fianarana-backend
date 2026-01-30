@@ -34,9 +34,7 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
 
-// --- ROUTES ---
-
-// Fisoratana anarana
+// --- ROUTES AUTH ---
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password, pseudo } = req.body;
@@ -46,7 +44,6 @@ app.post('/api/auth/register', async (req, res) => {
     } catch (err) { res.status(400).json({ success: false }); }
 });
 
-// Login
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -57,7 +54,7 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// Lisitry ny cours rehetra
+// --- ROUTES COURSES ---
 app.get('/api/courses/all', async (req, res) => {
     try {
         const courses = await Course.find().sort({ _id: -1 });
@@ -65,12 +62,37 @@ app.get('/api/courses/all', async (req, res) => {
     } catch (err) { res.status(500).send("Erreur server"); }
 });
 
-// Mpianatra mandefa paiement (isActivated: false)
+// --- ROUTES FAVORITES ---
+app.get('/api/favorites/count', async (req, res) => {
+    try {
+        const { email } = req.query;
+        const count = await Favorite.countDocuments({ email: email.toLowerCase().trim() });
+        res.json({ count });
+    } catch (err) { res.status(500).json({ count: 0 }); }
+});
+
+app.post('/api/favorites/toggle', async (req, res) => {
+    try {
+        const { email, courseId } = req.body;
+        const formattedEmail = email.toLowerCase().trim();
+        const existing = await Favorite.findOne({ email: formattedEmail, courseId });
+        if (existing) {
+            await Favorite.deleteOne({ email: formattedEmail, courseId });
+            return res.json({ success: true, action: "removed" });
+        } else {
+            const newFav = new Favorite({ email: formattedEmail, courseId });
+            await newFav.save();
+            return res.json({ success: true, action: "added" });
+        }
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+// --- LOJIKA VALIDATION (ENROLLMENT) ---
+
 app.post('/api/enroll', async (req, res) => {
     try {
         const { userEmail, courseId, transactionRef, method } = req.body;
         const formattedEmail = userEmail.toLowerCase().trim();
-        
         const existing = await Enrollment.findOne({ userEmail: formattedEmail, courseId });
         if (existing) return res.status(400).json({ message: "Efa miandry validation ianao!" });
 
@@ -86,16 +108,6 @@ app.post('/api/enroll', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Erreur" }); }
 });
 
-// Mpianatra mijery ny cours-ny (isActivated: true ihany)
-app.get('/api/my-learning/:email', async (req, res) => {
-    try {
-        const email = req.params.email.toLowerCase().trim();
-        const enrollments = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
-        res.json(enrollments.filter(e => e.courseId).map(e => e.courseId));
-    } catch (err) { res.status(500).json([]); }
-});
-
-// Admin mijery ny paiement miandry
 app.get('/api/admin/pending-payments', async (req, res) => {
     try {
         const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
@@ -109,7 +121,6 @@ app.get('/api/admin/pending-payments', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// Admin manao validation
 app.post('/api/admin/approve-payment', async (req, res) => {
     try {
         const { enrollId } = req.body;
@@ -119,11 +130,19 @@ app.post('/api/admin/approve-payment', async (req, res) => {
             { new: true }
         );
         if (updated) {
-            res.json({ success: true });
+            res.json({ success: true, message: "Validé!" });
         } else {
-            res.status(404).json({ success: false });
+            res.status(404).json({ success: false, message: "Tsy hita" });
         }
     } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get('/api/my-learning/:email', async (req, res) => {
+    try {
+        const email = req.params.email.toLowerCase().trim();
+        const enrollments = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
+        res.json(enrollments.filter(e => e.courseId).map(e => e.courseId));
+    } catch (err) { res.status(500).json([]); }
 });
 
 const PORT = process.env.PORT || 5000;
