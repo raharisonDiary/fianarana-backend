@@ -7,11 +7,11 @@ app.use(cors());
 app.use(express.json());
 
 const MONGO_URI = "mongodb+srv://diary:diary1234@cluster0.q60ysss.mongodb.net/fianarana?retryWrites=true&w=majority";
+
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Mifandray amin'ny MongoDB Atlas"))
   .catch(err => console.log("❌ Erreur MongoDB:", err));
 
-// --- MODELS ---
 
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
@@ -33,7 +33,6 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
 
-// Enrollment Model navaozina
 const Enrollment = mongoose.model('Enrollment', new mongoose.Schema({
     userEmail: { type: String, required: true },
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
@@ -70,18 +69,11 @@ app.post('/api/courses/add', async (req, res) => {
     try {
         const { title, price, image, desc, category } = req.body;
         const newCourse = new Course({
-            title,
-            desc,
-            price: Number(price),
-            image,
-            category,
-            lessons: []
+            title, desc, price: Number(price), image, category, lessons: []
         });
         await newCourse.save();
-        res.status(201).json({ success: true, message: "Course added!" });
-    } catch (err) {
-        res.status(400).json({ success: false, message: err.message });
-    }
+        res.status(201).json({ success: true });
+    } catch (err) { res.status(400).json({ success: false }); }
 });
 
 app.get('/api/courses/all', async (req, res) => {
@@ -109,16 +101,7 @@ app.post('/api/favorites/toggle', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-app.get('/api/favorites/all', async (req, res) => {
-    try {
-        const { email } = req.query;
-        const favs = await Favorite.find({ email: email.toLowerCase().trim() }).populate('courseId');
-        const courses = favs.filter(f => f.courseId).map(f => f.courseId);
-        res.json(courses);
-    } catch (err) { res.status(500).json([]); }
-});
-
-// --- ROUTES ENROLLMENT (Miankina amin'ny Payment Manuel) ---
+// --- ROUTES ENROLLMENT (Lojika namboarina) ---
 
 app.post('/api/enroll', async (req, res) => {
     try {
@@ -135,7 +118,7 @@ app.post('/api/enroll', async (req, res) => {
             courseId,
             transactionRef,
             method,
-            isActivated: false // Miandry ny admin
+            isActivated: false 
         });
         await newEnroll.save();
         res.status(201).json({ success: true, message: "Demande envoyée!" });
@@ -147,7 +130,6 @@ app.post('/api/enroll', async (req, res) => {
 app.get('/api/my-learning/:email', async (req, res) => {
     try {
         const email = req.params.email.toLowerCase().trim();
-        // Ny efa validé ihany no mivoaka
         const enrollments = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
         
         const courses = enrollments
@@ -160,7 +142,7 @@ app.get('/api/my-learning/:email', async (req, res) => {
     }
 });
 
-// --- ADMIN ROUTES (Dashboard & Approval) ---
+// --- ADMIN ROUTES ---
 
 app.get('/api/admin/pending-payments', async (req, res) => {
     try {
@@ -173,20 +155,16 @@ app.get('/api/admin/pending-payments', async (req, res) => {
             method: p.method
         }));
         res.json(formatted);
-    } catch (err) {
-        res.status(500).json([]);
-    }
+    } catch (err) { res.status(500).json([]); }
 });
 
 app.post('/api/admin/approve-payment', async (req, res) => {
     try {
         const { enrollId } = req.body;
         await Enrollment.findByIdAndUpdate(enrollId, { isActivated: true });
-        res.json({ success: true, message: "Validé!" });
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Backend mandeha amin'ny port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server mandeha amin'ny port ${PORT}`));
