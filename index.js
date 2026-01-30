@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const Enrollment = require('./models/Enrollment'); 
 
 const app = express();
 app.use(cors());
@@ -10,8 +11,6 @@ const MONGO_URI = "mongodb+srv://diary:diary1234@cluster0.q60ysss.mongodb.net/fi
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Mifandray amin'ny MongoDB Atlas"))
   .catch(err => console.log("❌ Erreur MongoDB:", err));
-
-// --- MODELS ---
 
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
@@ -33,18 +32,6 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
 
-// Enrollment Model (Natao iray ihany mba tsy hisy fifanoherana)
-const Enrollment = mongoose.model('Enrollment', new mongoose.Schema({
-    userEmail: { type: String, required: true },
-    courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
-    transactionRef: { type: String }, 
-    method: { type: String },          
-    isActivated: { type: Boolean, default: false }, 
-    enrolledAt: { type: Date, default: Date.now }
-}));
-
-// --- ROUTES AUTH ---
-
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password, pseudo } = req.body;
@@ -63,8 +50,6 @@ app.post('/api/auth/login', async (req, res) => {
         } else { res.status(401).json({ success: false }); }
     } catch (err) { res.status(500).json({ success: false }); }
 });
-
-// --- ROUTES COURSES ---
 
 app.post('/api/courses/add', async (req, res) => {
     try {
@@ -85,8 +70,6 @@ app.get('/api/courses/all', async (req, res) => {
         res.json(courses);
     } catch (err) { res.status(500).send("Erreur server"); }
 });
-
-// --- ROUTES FAVORITES ---
 
 app.post('/api/favorites/toggle', async (req, res) => {
     try {
@@ -113,8 +96,6 @@ app.get('/api/favorites/all', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// --- ROUTES ENROLLMENT ---
-
 app.post('/api/enroll', async (req, res) => {
     try {
         const { userEmail, courseId, transactionRef, method } = req.body;
@@ -130,36 +111,28 @@ app.post('/api/enroll', async (req, res) => {
             courseId,
             transactionRef,
             method,
-            isActivated: false // Default dia false foana miandry Admin
+            isActivated: false 
         });
         await newEnroll.save();
         res.status(201).json({ success: true, message: "Demande envoyée!" });
     } catch (err) {
-        res.status(500).json({ message: "Erreur tamin'ny fividianana" });
+        res.status(500).json({ message: "Erreur" });
     }
 });
 
 app.get('/api/my-learning/:email', async (req, res) => {
     try {
         const email = req.params.email.toLowerCase().trim();
-        // ISY SIVANA: Ny efa validé (isActivated: true) ihany no hita ao amin'ny MyLearning
         const enrollments = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
-        
-        const courses = enrollments
-            .filter(e => e.courseId != null)
-            .map(e => e.courseId);
-            
+        const courses = enrollments.filter(e => e.courseId != null).map(e => e.courseId);
         res.json(courses);
     } catch (err) {
         res.status(500).json([]);
     }
 });
 
-// --- ADMIN ROUTES ---
-
 app.get('/api/admin/pending-payments', async (req, res) => {
     try {
-        // Alaina daholo ny isActivated: false
         const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
         const formatted = pending.map(p => ({
             _id: p._id,
@@ -177,13 +150,11 @@ app.get('/api/admin/pending-payments', async (req, res) => {
 app.post('/api/admin/approve-payment', async (req, res) => {
     try {
         const { enrollId } = req.body;
-        // Eto vao miova ho 'true' ny isActivated rehefa mandefa an'ity POST ity ny Admin
         const updated = await Enrollment.findByIdAndUpdate(enrollId, { isActivated: true }, { new: true });
-        
         if (updated) {
             res.json({ success: true, message: "Validé!" });
         } else {
-            res.status(404).json({ success: false, message: "Enrollment non trouvé" });
+            res.status(404).json({ success: false, message: "Non trouvé" });
         }
     } catch (err) {
         res.status(500).json({ success: false });
@@ -191,4 +162,4 @@ app.post('/api/admin/approve-payment', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Backend mandeha amin'ny port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));
