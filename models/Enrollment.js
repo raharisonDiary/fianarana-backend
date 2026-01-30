@@ -5,7 +5,7 @@ const EnrollmentSchema = new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
     transactionRef: { type: String },
     method: { type: String },
-    isActivated: { type: Boolean, default: false },
+    isActivated: { type: Boolean, default: false }, // Ity no mifehy ny fahitana ny cours
     enrolledAt: { type: Date, default: Date.now }
 });
 
