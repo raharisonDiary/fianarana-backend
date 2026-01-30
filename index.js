@@ -33,9 +33,13 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
 
+// Enrollment Model navaozina
 const Enrollment = mongoose.model('Enrollment', new mongoose.Schema({
     userEmail: { type: String, required: true },
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
+    transactionRef: { type: String }, 
+    method: { type: String },         
+    isActivated: { type: Boolean, default: false }, 
     enrolledAt: { type: Date, default: Date.now }
 }));
 
@@ -114,22 +118,27 @@ app.get('/api/favorites/all', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// --- ROUTES ENROLLMENT (MY LEARNING) ---
+// --- ROUTES ENROLLMENT (Miankina amin'ny Payment Manuel) ---
 
 app.post('/api/enroll', async (req, res) => {
     try {
-        const { userEmail, courseId } = req.body;
+        const { userEmail, courseId, transactionRef, method } = req.body;
         const formattedEmail = userEmail.toLowerCase().trim();
 
-        // Jereo raha efa nividy izy
         const existing = await Enrollment.findOne({ userEmail: formattedEmail, courseId });
         if (existing) {
-            return res.status(400).json({ message: "Efa nividy ity cours ity ianao!" });
+            return res.status(400).json({ message: "Efa nanao fangatahana ianao!" });
         }
 
-        const newEnroll = new Enrollment({ userEmail: formattedEmail, courseId });
+        const newEnroll = new Enrollment({ 
+            userEmail: formattedEmail, 
+            courseId,
+            transactionRef,
+            method,
+            isActivated: false // Miandry ny admin
+        });
         await newEnroll.save();
-        res.status(201).json({ success: true, message: "Tafiditra ao amin'ny fianaranao!" });
+        res.status(201).json({ success: true, message: "Demande envoyée!" });
     } catch (err) {
         res.status(500).json({ message: "Erreur tamin'ny fividianana" });
     }
@@ -138,9 +147,9 @@ app.post('/api/enroll', async (req, res) => {
 app.get('/api/my-learning/:email', async (req, res) => {
     try {
         const email = req.params.email.toLowerCase().trim();
-        const enrollments = await Enrollment.find({ userEmail: email }).populate('courseId');
+        // Ny efa validé ihany no mivoaka
+        const enrollments = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
         
-        // Sivanina mba tsy hisy cours efa voafafa (null)
         const courses = enrollments
             .filter(e => e.courseId != null)
             .map(e => e.courseId);
@@ -148,6 +157,34 @@ app.get('/api/my-learning/:email', async (req, res) => {
         res.json(courses);
     } catch (err) {
         res.status(500).json([]);
+    }
+});
+
+// --- ADMIN ROUTES (Dashboard & Approval) ---
+
+app.get('/api/admin/pending-payments', async (req, res) => {
+    try {
+        const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
+        const formatted = pending.map(p => ({
+            _id: p._id,
+            userEmail: p.userEmail,
+            courseTitle: p.courseId ? p.courseId.title : "Cours inconnu",
+            transactionRef: p.transactionRef,
+            method: p.method
+        }));
+        res.json(formatted);
+    } catch (err) {
+        res.status(500).json([]);
+    }
+});
+
+app.post('/api/admin/approve-payment', async (req, res) => {
+    try {
+        const { enrollId } = req.body;
+        await Enrollment.findByIdAndUpdate(enrollId, { isActivated: true });
+        res.json({ success: true, message: "Validé!" });
+    } catch (err) {
+        res.status(500).json({ success: false });
     }
 });
 
