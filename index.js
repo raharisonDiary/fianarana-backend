@@ -167,5 +167,19 @@ app.delete('/api/enroll/:id', async (req, res) => {
     }
 });
 
+
+app.get('/api/admin/all-sales', async (req, res) => {
+    try {
+        const sales = await Enrollment.find()
+            .populate('courseId')
+            .sort({ createdAt: -1 }); 
+            
+        res.json(sales);
+    } catch (err) {
+        console.error("Erreur All Sales:", err);
+        res.status(500).json({ message: "Erreur serveur" });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));
