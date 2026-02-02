@@ -148,18 +148,25 @@ app.get('/api/my-learning/:email', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// HAHITSIO NY FAMAFANA (Mba handaitra avy hatrany)
+
 app.delete('/api/enroll/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        console.log("Fafana ny ID:", id); // Hijerena azy ao amin'ny terminal an'ny Render
+
+        // Famafana mivantana amin'ny ID
         const deleted = await Enrollment.findByIdAndDelete(id);
+        
         if (deleted) {
-            res.json({ success: true, message: "Commande annulée" });
+            console.log("✅ Voafafa soa aman-tsara");
+            return res.status(200).json({ success: true, message: "Voafafa" });
         } else {
-            res.json({ success: false, message: "Tsy hita ilay commande" });
+            console.log("❌ Tsy hita ilay ID");
+            return res.status(404).json({ success: false, message: "Tsy hita" });
         }
     } catch (err) {
-        res.status(500).json({ success: false });
+        console.error("Delete Error:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
