@@ -150,7 +150,8 @@ app.post('/api/admin/approve-payment', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));*/ 
+app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));*/
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -166,7 +167,6 @@ mongoose.connect(MONGO_URI)
   .catch(err => console.log("❌ Erreur MongoDB:", err));
 
 // --- MODELS ---
-
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -182,16 +182,9 @@ const Course = mongoose.model('Course', new mongoose.Schema({
     lessons: { type: Array, default: [] }
 }));
 
-const Favorite = mongoose.model('Favorite', new mongoose.Schema({
-    email: { type: String, required: true },
-    courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
-}));
+const Enrollment = require('./models/Enrollment');
 
-// Enrollment Model
-const Enrollment = require('./models/Enrollment'); 
-
-// --- ROUTES ---
-
+// --- ROUTES AUTH & COURSES (Tsy novaina) ---
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password, pseudo } = req.body;
@@ -218,110 +211,68 @@ app.get('/api/courses/all', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-app.post('/api/courses/add', async (req, res) => {
-    try {
-        const { title, price, image, desc, category } = req.body;
-        const newCourse = new Course({ title, desc, price: Number(price), image, category });
-        await newCourse.save();
-        res.status(201).json({ success: true });
-    } catch (err) { res.status(400).json({ success: false }); }
-});
+// --- LOJIKA VAOVAO: ENROLLMENT & VALIDATION ---
 
-// --- ENROLLMENT & VALIDATION LOGIC ---
-
-// 1. Mandefa fangatahana (isActivated dia FALSE foana eto)
+// 1. Mandefa fangatahana (isActivated dia FALSE foana)
 app.post('/api/enroll', async (req, res) => {
     try {
         const { userEmail, courseId, transactionRef, method } = req.body;
-        const formattedEmail = userEmail.toLowerCase().trim();
-        
-        const existing = await Enrollment.findOne({ userEmail: formattedEmail, courseId });
-        if (existing) return res.status(400).json({ message: "Efa miandry validation ianao." });
+        console.log("Fangatahana vaovao avy amin'i:", userEmail);
 
-        const newEnroll = new Enrollment({ 
-            userEmail: formattedEmail, 
-            courseId, 
-            transactionRef, 
-            method, 
+        const newEnroll = new Enrollment({
+            userEmail: userEmail.toLowerCase().trim(),
+            courseId,
+            transactionRef,
+            method,
             isActivated: false 
         });
+
         await newEnroll.save();
         res.status(201).json({ success: true });
-    } catch (err) { res.status(500).json({ success: false }); }
-});
-
-// 2. My Learning (Ireo manana isActivated: TRUE ihany)
-app.get('/api/my-learning/:email', async (req, res) => {
-    try {
-        const email = req.params.email.toLowerCase().trim();
-        const enrollments = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
-        const courses = enrollments.filter(e => e.courseId).map(e => e.courseId);
-        res.json(courses);
-    } catch (err) { res.status(500).json([]); }
-});
-
-// 3. Admin: Mijery ireo mbola FALSE ihany
-app.get('/api/admin/pending-payments', async (req, res) => {
-    try {
-        const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
-        res.json(pending.map(p => ({
-            _id: p._id,
-            userEmail: p.userEmail,
-            courseTitle: p.courseId ? p.courseId.title : "Cours inconnu",
-            transactionRef: p.transactionRef,
-            method: p.method
-        })));
-    } catch (err) { res.status(500).json([]); }
-});
-
-// 4. Admin: Validation (Ito no manova azy ho TRUE)
-app.post('/api/admin/approve-payment', async (req, res) => {
-    try {
-        const { enrollId } = req.body;
-        console.log("ID voaray:", enrollId);
-
-        // Nampiana findById mba ho azo antoka fa misy ilay izy
-        const enrollment = await Enrollment.findById(enrollId);
-        
-        if (!enrollment) {
-            console.log("❌ Tsy hita ao amin'ny DB io ID io");
-            return res.status(404).json({ success: false, message: "Enregistrement non trouvé" });
-        }
-
-        // Ovaina ho true amin'izay
-        enrollment.isActivated = true;
-        await enrollment.save();
-
-        console.log("✅ Validation vita soa aman-tsara");
-        res.json({ success: true });
-
     } catch (err) {
-        console.error("❌ Erreur validation:", err);
-        res.status(500).json({ success: false, error: err.message });
+        console.error("Erreur Enroll:", err);
+        res.status(500).json({ success: false });
     }
 });
 
-// Favorites
-app.post('/api/favorites/toggle', async (req, res) => {
+// 2. Admin: Mahita ireo miandry fotsiny (Pending)
+app.get('/api/admin/pending-payments', async (req, res) => {
     try {
-        const { email, courseId } = req.body;
-        const existing = await Favorite.findOne({ email: email.toLowerCase().trim(), courseId });
-        if (existing) {
-            await Favorite.deleteOne({ email: email.toLowerCase().trim(), courseId });
-            res.json({ success: true, action: "removed" });
-        } else {
-            const newFav = new Favorite({ email: email.toLowerCase().trim(), courseId });
-            await newFav.save();
-            res.json({ success: true, action: "added" });
-        }
-    } catch (err) { res.status(500).json({ success: false }); }
+        const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
+        res.json(pending);
+    } catch (err) { res.status(500).json([]); }
 });
 
-app.get('/api/favorites/all', async (req, res) => {
+// 3. Admin: Manova ho TRUE (Validation)
+app.post('/api/admin/approve-payment', async (req, res) => {
+  try {
+      const { enrollId } = req.body;
+      console.log("ID hovalider-na:", enrollId);
+
+      const updated = await Enrollment.findByIdAndUpdate(
+          enrollId, 
+          { isActivated: true },
+          { new: true }
+      );
+
+      if (updated) {
+          console.log("✅ Vita validation!");
+          res.json({ success: true });
+      } else {
+          res.status(404).json({ success: false, message: "Tsy hita ilay enrollment" });
+      }
+  } catch (err) {
+      console.error("Erreur approve:", err);
+      res.status(500).json({ success: false });
+  }
+});
+
+// 4. Student: Mahita ny cours-ny rehefa TRUE
+app.get('/api/my-learning/:email', async (req, res) => {
     try {
-        const { email } = req.query;
-        const favs = await Favorite.find({ email: email.toLowerCase().trim() }).populate('courseId');
-        res.json(favs.filter(f => f.courseId).map(f => f.courseId));
+        const email = req.params.email.toLowerCase().trim();
+        const mine = await Enrollment.find({ userEmail: email, isActivated: true }).populate('courseId');
+        res.json(mine.filter(m => m.courseId).map(m => m.courseId));
     } catch (err) { res.status(500).json([]); }
 });
 
