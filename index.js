@@ -151,7 +151,6 @@ app.post('/api/admin/approve-payment', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));*/
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -166,7 +165,7 @@ mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Mifandray amin'ny MongoDB Atlas"))
   .catch(err => console.log("❌ Erreur MongoDB:", err));
 
-// --- MODELS ---
+// --- 1. MODELS ---
 const User = mongoose.model('User', new mongoose.Schema({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
@@ -182,9 +181,15 @@ const Course = mongoose.model('Course', new mongoose.Schema({
     lessons: { type: Array, default: [] }
 }));
 
-const Enrollment = require('./models/Enrollment');
+const Favorite = mongoose.model('Favorite', new mongoose.Schema({
+    email: { type: String, required: true },
+    courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
+}));
 
-// --- ROUTES AUTH & COURSES (Tsy novaina) ---
+// Ataovy azo antoka fa misy ity fichier ity ao amin'ny folder-nao
+const Enrollment = require('./models/Enrollment'); 
+
+// --- 2. ROUTES AUTH ---
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, password, pseudo } = req.body;
@@ -204,6 +209,7 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
+// --- 3. ROUTES COURSES (Ity no mampipoitra ny Home) ---
 app.get('/api/courses/all', async (req, res) => {
     try {
         const courses = await Course.find().sort({ _id: -1 });
@@ -211,14 +217,44 @@ app.get('/api/courses/all', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// --- LOJIKA VAOVAO: ENROLLMENT & VALIDATION ---
+app.post('/api/courses/add', async (req, res) => {
+    try {
+        const { title, price, image, desc, category } = req.body;
+        const newCourse = new Course({ title, desc, price: Number(price), image, category });
+        await newCourse.save();
+        res.status(201).json({ success: true });
+    } catch (err) { res.status(400).json({ success: false }); }
+});
 
-// 1. Mandefa fangatahana (isActivated dia FALSE foana)
+// --- 4. ROUTES FAVORITES ---
+app.post('/api/favorites/toggle', async (req, res) => {
+    try {
+        const { email, courseId } = req.body;
+        const formattedEmail = email.toLowerCase().trim();
+        const existing = await Favorite.findOne({ email: formattedEmail, courseId });
+        if (existing) {
+            await Favorite.deleteOne({ email: formattedEmail, courseId });
+            res.json({ success: true, action: "removed" });
+        } else {
+            const newFav = new Favorite({ email: formattedEmail, courseId });
+            await newFav.save();
+            res.json({ success: true, action: "added" });
+        }
+    } catch (err) { res.status(500).json({ success: false }); }
+});
+
+app.get('/api/favorites/all', async (req, res) => {
+    try {
+        const { email } = req.query;
+        const favs = await Favorite.find({ email: email.toLowerCase().trim() }).populate('courseId');
+        res.json(favs.filter(f => f.courseId).map(f => f.courseId));
+    } catch (err) { res.status(500).json([]); }
+});
+
+// --- 5. ROUTES ENROLLMENT & VALIDATION ---
 app.post('/api/enroll', async (req, res) => {
     try {
         const { userEmail, courseId, transactionRef, method } = req.body;
-        console.log("Fangatahana vaovao avy amin'i:", userEmail);
-
         const newEnroll = new Enrollment({
             userEmail: userEmail.toLowerCase().trim(),
             courseId,
@@ -226,16 +262,11 @@ app.post('/api/enroll', async (req, res) => {
             method,
             isActivated: false 
         });
-
         await newEnroll.save();
         res.status(201).json({ success: true });
-    } catch (err) {
-        console.error("Erreur Enroll:", err);
-        res.status(500).json({ success: false });
-    }
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 2. Admin: Mahita ireo miandry fotsiny (Pending)
 app.get('/api/admin/pending-payments', async (req, res) => {
     try {
         const pending = await Enrollment.find({ isActivated: false }).populate('courseId');
@@ -243,31 +274,14 @@ app.get('/api/admin/pending-payments', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// 3. Admin: Manova ho TRUE (Validation)
 app.post('/api/admin/approve-payment', async (req, res) => {
-  try {
-      const { enrollId } = req.body;
-      console.log("ID hovalider-na:", enrollId);
-
-      const updated = await Enrollment.findByIdAndUpdate(
-          enrollId, 
-          { isActivated: true },
-          { new: true }
-      );
-
-      if (updated) {
-          console.log("✅ Vita validation!");
-          res.json({ success: true });
-      } else {
-          res.status(404).json({ success: false, message: "Tsy hita ilay enrollment" });
-      }
-  } catch (err) {
-      console.error("Erreur approve:", err);
-      res.status(500).json({ success: false });
-  }
+    try {
+        const { enrollId } = req.body;
+        await Enrollment.findByIdAndUpdate(enrollId, { isActivated: true });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 4. Student: Mahita ny cours-ny rehefa TRUE
 app.get('/api/my-learning/:email', async (req, res) => {
     try {
         const email = req.params.email.toLowerCase().trim();
