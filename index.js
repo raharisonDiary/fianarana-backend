@@ -113,7 +113,6 @@ app.post('/api/enroll', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// VAOVA: Route hakana ny commandes-nao manokana (pending)
 app.get('/api/my-pending-payments', async (req, res) => {
     try {
         const { email } = req.query;
@@ -149,12 +148,16 @@ app.get('/api/my-learning/:email', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-// ANTSY: Nohitsiko Enroll -> Enrollment ary status -> isActivated
+// HAHITSIO NY FAMAFANA (Mba handaitra avy hatrany)
 app.delete('/api/enroll/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        await Enrollment.findOneAndDelete({ _id: id, isActivated: false });
-        res.json({ success: true, message: "Commande annulée" });
+        const deleted = await Enrollment.findByIdAndDelete(id);
+        if (deleted) {
+            res.json({ success: true, message: "Commande annulée" });
+        } else {
+            res.json({ success: false, message: "Tsy hita ilay commande" });
+        }
     } catch (err) {
         res.status(500).json({ success: false });
     }
