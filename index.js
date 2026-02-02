@@ -290,5 +290,15 @@ app.get('/api/my-learning/:email', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
+app.delete('/api/enroll/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await Enroll.findOneAndDelete({ _id: id, status: 'pending' });
+        res.json({ success: true, message: "Commande annulée" });
+    } catch (err) {
+        res.status(500).json({ success: false });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Port ${PORT}`));
