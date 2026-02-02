@@ -278,17 +278,27 @@ app.get('/api/admin/pending-payments', async (req, res) => {
 app.post('/api/admin/approve-payment', async (req, res) => {
     try {
         const { enrollId } = req.body;
-        const updated = await Enrollment.findByIdAndUpdate(
-            enrollId, 
-            { isActivated: true }, 
-            { new: true }
-        );
-        if (updated) {
-            res.json({ success: true });
-        } else {
-            res.status(404).json({ success: false, message: "ID tsy hita" });
+        console.log("ID voaray:", enrollId);
+
+        // Nampiana findById mba ho azo antoka fa misy ilay izy
+        const enrollment = await Enrollment.findById(enrollId);
+        
+        if (!enrollment) {
+            console.log("❌ Tsy hita ao amin'ny DB io ID io");
+            return res.status(404).json({ success: false, message: "Enregistrement non trouvé" });
         }
-    } catch (err) { res.status(500).json({ success: false }); }
+
+        // Ovaina ho true amin'izay
+        enrollment.isActivated = true;
+        await enrollment.save();
+
+        console.log("✅ Validation vita soa aman-tsara");
+        res.json({ success: true });
+
+    } catch (err) {
+        console.error("❌ Erreur validation:", err);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // Favorites
