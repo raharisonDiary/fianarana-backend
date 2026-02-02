@@ -33,6 +33,7 @@ const Favorite = mongoose.model('Favorite', new mongoose.Schema({
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true }
 }));
 
+// TANDREMO: Hamarino fa mety tsara ny ao anatin'ity file ity
 const Enrollment = require('./models/Enrollment'); 
 
 // --- 2. ROUTES AUTH ---
@@ -116,9 +117,9 @@ app.post('/api/enroll', async (req, res) => {
 app.get('/api/my-pending-payments', async (req, res) => {
     try {
         const { email } = req.query;
-        const formattedEmail = email.toLowerCase().trim();
+        if (!email) return res.json([]);
         const pending = await Enrollment.find({ 
-            userEmail: formattedEmail, 
+            userEmail: email.toLowerCase().trim(), 
             isActivated: false 
         }).populate('courseId');
         res.json(pending);
@@ -148,25 +149,21 @@ app.get('/api/my-learning/:email', async (req, res) => {
     } catch (err) { res.status(500).json([]); }
 });
 
-
+// NOHITSIKO NY DELETE (Tena azo antoka)
 app.delete('/api/enroll/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("Fafana ny ID:", id); // Hijerena azy ao amin'ny terminal an'ny Render
-
-        // Famafana mivantana amin'ny ID
-        const deleted = await Enrollment.findByIdAndDelete(id);
+        // Ampiasaina ny deleteOne raha sanatria misy olana ny findByIdAndDelete
+        const result = await Enrollment.deleteOne({ _id: id });
         
-        if (deleted) {
-            console.log("✅ Voafafa soa aman-tsara");
-            return res.status(200).json({ success: true, message: "Voafafa" });
+        if (result.deletedCount > 0) {
+            res.status(200).json({ success: true });
         } else {
-            console.log("❌ Tsy hita ilay ID");
-            return res.status(404).json({ success: false, message: "Tsy hita" });
+            res.status(404).json({ success: false, message: "Non trouvé" });
         }
     } catch (err) {
         console.error("Delete Error:", err);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false });
     }
 });
 
